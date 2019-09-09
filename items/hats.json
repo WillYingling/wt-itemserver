@@ -1,0 +1,6 @@
+{
+    "Name": "hats",
+    "Styles": [{"Name": "beanie"},
+            {"Name": "tophat"},
+            {"Name": "beret", "Disabled": true}]
+}

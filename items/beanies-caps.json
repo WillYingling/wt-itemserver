@@ -1,0 +1,8 @@
+{
+    "Name": "caps",
+    "Styles": [
+            {"Name": "Navy"},
+            {"Name": "Lt. blue"},
+            {"Name": "Red"}
+    ]
+}
