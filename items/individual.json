@@ -1,6 +1,0 @@
-{
-    "Name": "individual",
-    "Styles": [{"Name": "human"},
-            {"Name": "dog"},
-            {"Name": "cat"}]
-}
