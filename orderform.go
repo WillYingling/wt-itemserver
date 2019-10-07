@@ -51,8 +51,7 @@ func newOrderServer() (*OrderServer, error) {
 		return nil, err
 	}
 
-	//osrv.Handle("/", http.FileServer(http.Dir("react-site/build")))
-	osrv.HandleFunc("/options", osrv.serveOptions)
+	osrv.HandleFunc("/", osrv.serveOptions)
 	return osrv, nil
 }
 

@@ -9,7 +9,7 @@ import (
 // Style is a type of item that can be disabled
 type Style struct {
 	Name     string
-	Disabled bool `json:omitempty`
+	Disabled bool `json: omitempty`
 }
 
 // Item describes a named item that can come in a number of styles.
