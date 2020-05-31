@@ -59,7 +59,7 @@ func (il ItemList) MarshalJSON() ([]byte, error) {
 	return []byte(final), nil
 }
 
-func LoadItemDir(dir string) (ItemList, error) {
+func loadItemDir(dir string) (ItemList, error) {
 	fd, err := os.Open(dir)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func LoadItemDir(dir string) (ItemList, error) {
 			continue
 		}
 
-		itemFd, err := os.Open(dir + itemFile)
+		itemFd, err := os.Open(dir + "/" + itemFile)
 		if err != nil {
 			return nil, err
 		}
@@ -96,5 +96,4 @@ func LoadItemDir(dir string) (ItemList, error) {
 	}
 
 	return itemList, nil
-
 }
