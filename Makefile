@@ -13,3 +13,4 @@ $(BIN_DIR)/$(SERVER_BIN): $(BIN_DIR) $(SRC)
 
 clean:
 	rm -rf $(BIN_DIR)
+	rm go.sum

@@ -1,3 +1,4 @@
 bin/
 items/
 *.swp
+go.sum
