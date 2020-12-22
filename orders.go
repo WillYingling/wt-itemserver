@@ -2,99 +2,63 @@ package main
 
 import (
 	"bytes"
-	//	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"html/template"
-	"net/smtp"
-	"os"
-	"strings"
-
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 const (
 	EmailTemplate = `
 <html>
-	<h3> {{.Title}} </h3>
-	<p> Board Size: {{.Size}} </p>
+	<h3> {{.Board.Title}} </h3>
+	<p> Board Size: {{.Board.Size}} </p>
 
-	{{range $i, $p := .PeopleOptions}}
-		<p> Snowperson #{{inc $i }}: {{$p.Name}} <br/>
-		&nbsp;&nbsp; Cap Color: {{$p.CapColor}} <br />
-		&nbsp;&nbsp; Brim Color: {{$p.BrimColor}} <br />
-		&nbsp;&nbsp; Pom Color: {{$p.PomColor}} <br />
-		</p>
-	{{end}}
+{{range $i, $p := .Board.PeopleOptions}}
+	<p> Snowperson #{{inc $i }}: {{$p.Name}} <br/>
+	&nbsp;&nbsp; Cap Color: {{$p.CapColor}} <br />
+	&nbsp;&nbsp; Brim Color: {{$p.BrimColor}} <br />
+	&nbsp;&nbsp; Pom Color: {{$p.PomColor}} <br />
+	</p>
+{{end}}
+
+{{range $i, $e := .Board.Extras}}
+	<p> Extra #{{inc $i }}: {{$e.Type}} <br/>
+	&nbsp;&nbsp; Name: {{$e.Name}} <br />
+	&nbsp;&nbsp; Notes: {{$e.Notes}} <br />
+	</p>
+{{end}}
+
+	<p>
+		<u> Contact Info </u> <br />
+		Name: {{.Info.Name}} <br />
+		Preference: {{.Info.Preference}} <br />
+		Email: {{.Info.Email}} <br />
+		Phone Number: {{.Info.PhoneNum}} <br />
+	</p>
+
+	<a href="http://{{.NotifyUrl}}" > Notify this customer </a>
+
 </html>
 	`
 )
 
 var (
-	fromAddress = "woodnthings@example.net"
-	toAddress   = []string{"willyingling@gmail.com"}
-	mailServer  = "smtp.gmail.com"
-	mailPort    = "587"
+	orderCt = 0
 
-	orderCt      = 0
-	mailCredPath = "$HOME/.config/emailAuth.json"
+	orderList []boardOrder
 )
 
-var (
-	credentials mailCredentials
-)
-
-type mailCredentials struct {
-	Email    string
-	Password string
-}
-
-func (m *mailCredentials) readFromStdIn() error {
-	fmt.Printf("Email: ")
-	fmt.Fscanf(os.Stdin, "%s", &m.Email)
-	fmt.Printf("Password: ")
-	pass, err := terminal.ReadPassword(0)
-	fmt.Printf("\n")
-
-	if err != nil {
-		return err
-	}
-
-	m.Email = strings.TrimSpace(m.Email)
-	m.Password = strings.TrimSpace(string(pass))
-	return nil
-}
-
-func (m *mailCredentials) readFromFile(path string) error {
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	dec := json.NewDecoder(file)
-	return dec.Decode(m)
-}
-
-func readMailCredentials(interactive bool) error {
-	if interactive {
-		return credentials.readFromStdIn()
-	}
-	return credentials.readFromFile(os.ExpandEnv(mailCredPath))
-}
-
-type personOptions struct {
-	Name      string
-	HatType   string
-	CapColor  string
-	BrimColor string
-	PomColor  string
+type contactInfo struct {
+	Name       string
+	Preference string
+	Email      string
+	PhoneNum   string
 }
 
 type boardOrder struct {
-	Title         string
-	Size          int
-	PeopleOptions []personOptions
+	Board     snowmanBoard
+	NotifyUrl string
+	Info      contactInfo
+	id        int
 }
 
 func (bo boardOrder) String() string {
@@ -118,45 +82,37 @@ type OrderStatus struct {
 }
 
 func placeOrder(bo boardOrder) OrderStatus {
-	orderCt++
 	fmt.Printf("Received order: %d", orderCt)
 
+	bo.id = orderCt
+	// validate the order
+	bo.NotifyUrl += fmt.Sprintf("?id=%d", bo.id)
+	orderList = append(orderList, bo)
+
 	status := "failed"
+
 	err := mailNotification(bo)
 	if err == nil {
 		status = "Success"
+		orderCt++
 	} else {
 		fmt.Printf("Error submitting mail: %s\n", err)
 	}
 	return OrderStatus{Msg: status, OrderNum: orderCt}
 }
 
-func mailNotification(bo boardOrder) error {
-	// Exit early if there's no address
-	if credentials.Email == "" {
-		return nil
+func completeOrder(id int) error {
+	var bo boardOrder
+	found := false
+	for _, order := range orderList {
+		if order.id == id {
+			bo = order
+			found = true
+		}
 	}
 
-	auth := smtp.PlainAuth("",
-		credentials.Email,
-		credentials.Password,
-		mailServer)
-
-	err := smtp.SendMail(mailServer+":"+mailPort,
-		auth,
-		fromAddress,
-		toAddress,
-		[]byte(getMailHeaders()+"\r\n"+bo.String()),
-	)
-
-	return err
-}
-
-func getMailHeaders() string {
-	ret := ""
-	endline := "\r\n"
-	ret += "Content-Type: text/html" + endline
-	ret += "From: " + fromAddress + endline
-	ret += fmt.Sprintf("Subject: Order #%d"+endline, orderCt)
-	return ret
+	if found == false {
+		return fmt.Errorf("Order %d does not exist", id)
+	}
+	return notifyCustomer(bo)
 }

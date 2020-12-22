@@ -17,86 +17,50 @@ var (
 	errHatInvalid   = errors.New("Invalid hat options")
 )
 
-type hatType int
-
-const (
-	beanie hatType = iota
-	tophat
-	beret
-	none
-)
-
-type extraType int
-
-const (
-	dog extraType = iota
-	cat
-	individual
-	snowMom
-	snowDad
-)
-
-type snowman struct {
-	name       string
-	hat        hatType
-	hatOptions map[string]string
-}
-
-func (s *snowman) validate() error {
-	if len(s.name) > maxNameLength {
-		return errNameTooLong
-	}
-
-	switch s.hat {
-	case beanie:
-		capColor := s.hatOptions["cap"]
-		brimColor := s.hatOptions["brim"]
-		//pomColor := s.hatOptions["pom"]
-
-		if capColor == "" || brimColor == "" {
-			return errHatInvalid
-		}
-	case tophat:
-		color := s.hatOptions["color"]
-		if color != "black" {
-			return errHatInvalid
-		}
-	}
-	return nil
+type personOptions struct {
+	Name      string
+	HatType   string
+	CapColor  string
+	BrimColor string
+	PomColor  string
 }
 
 type extra struct {
-	name string
+	Type  string
+	Name  string
+	Notes string
 }
 
 type snowmanBoard struct {
-	title  string
-	size   int
-	people []snowman
-	extras []extra
+	Title         string
+	Size          int
+	PeopleOptions []personOptions
+	Extras        []extra
 }
 
 func (sb *snowmanBoard) validate() error {
-	if sb.size < minBoardSize ||
-		sb.size > maxBoardSize ||
-		len(sb.people) != sb.size {
+	if sb.Size < minBoardSize ||
+		sb.Size > maxBoardSize ||
+		len(sb.PeopleOptions) != sb.Size {
 		return errSizeInvalid
 	}
 
 	maxTitleLength := 30
-	if sb.size == 2 {
+	if sb.Size == 2 {
 		maxTitleLength = 15
 	}
 
-	if len(sb.title) > maxTitleLength {
+	if len(sb.Title) > maxTitleLength {
 		return errTitleTooLong
 	}
 
-	for _, person := range sb.people {
-		err := person.validate()
-		if err != nil {
-			return err
+	/*
+		for _, person := range sb.people {
+			err := person.validate()
+			if err != nil {
+				return err
+			}
 		}
-	}
+	*/
 	return nil
 }

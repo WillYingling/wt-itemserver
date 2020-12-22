@@ -2,62 +2,25 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
+	"github.com/spf13/viper"
 	"net/http"
+	"strconv"
 )
 
-var (
-	// address is the address of the server
-	address = ":8080"
-	// itemsDir is the directory where the webserver will look for
-	// json encoded items.
-	itemsDir         = "items/"
-	verbose          = false
-	forceInteractive = false
-)
-
-func init() {
-	flag.StringVar(&itemsDir, "i", "items/", "Directory containing item files")
-	flag.BoolVar(&verbose, "v", false, "Print verbose information")
-	flag.BoolVar(&forceInteractive, "interactive", false,
-		"Interactively enter mail credentials")
-}
-
-func main() {
-	flag.Parse()
-
-	err := readMailCredentials(forceInteractive)
-	if err != nil {
-		fmt.Printf("Failed to read mail credentials: %s\n", err)
-	}
-
-	verbosePrint("%s", credentials.Email)
-
+func startServer() error {
 	osrv, err := newOrderServer()
 	if err != nil {
-		fmt.Printf("Error creating server: %s\n", err)
-		return
+		return fmt.Errorf("Error creating server: %s\n", err)
 	}
-
+	address := fmt.Sprintf(":%d", viper.GetInt("Port"))
 	verbosePrint("Starting server on: %s\n", address)
 	s := &http.Server{
 		Addr:    address,
 		Handler: osrv,
 	}
 
-	verbosePrint("%v", s.ListenAndServe())
-}
-
-func verbosePrint(str string, args ...interface{}) {
-	if verbose {
-		fmt.Printf(str+"\n", args...)
-	}
-}
-
-func enableCors(w *http.ResponseWriter) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Content-Type", "application/json")
+	return s.ListenAndServe()
 }
 
 // OrderServer contains the server mux
@@ -70,18 +33,26 @@ func newOrderServer() (*OrderServer, error) {
 	osrv := &OrderServer{ServeMux: http.NewServeMux()}
 
 	var err error
-	osrv.itemList, err = loadItemDir(itemsDir)
+	osrv.itemList, err = loadItemDir()
 	if err != nil {
 		return nil, err
 	}
 
 	optionPath := "/options"
 	submitPath := "/submit"
+	notifyPath := "/notify"
 
 	verbosePrint("Serving options on %s", optionPath)
 	osrv.HandleFunc(optionPath, osrv.serveOptions)
 	verbosePrint("Serving submit on %s", submitPath)
 	osrv.HandleFunc(submitPath, osrv.serveSubmit)
+	verbosePrint("Serving notify on %s", notifyPath)
+	osrv.HandleFunc(notifyPath, osrv.serveNotify)
+	if viper.IsSet("siteDir") {
+		path := viper.GetString("siteDir")
+		fmt.Printf("Serving directory: %s\n", path)
+		osrv.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(path))))
+	}
 	return osrv, nil
 }
 
@@ -90,7 +61,7 @@ func (osrv *OrderServer) serveOptions(rw http.ResponseWriter, r *http.Request) {
 	enableCors(&rw)
 
 	var err error
-	osrv.itemList, err = loadItemDir(itemsDir)
+	osrv.itemList, err = loadItemDir()
 
 	if err != nil {
 		fmt.Printf("Error: %s", err)
@@ -104,11 +75,11 @@ func (osrv *OrderServer) serveSubmit(rw http.ResponseWriter, r *http.Request) {
 	verbosePrint("Serving submit: %v", r)
 	enableCors(&rw)
 
-	bo := boardOrder{}
+	bo := boardOrder{
+		NotifyUrl: "" + r.Host + "/notify",
+	}
 	dec := json.NewDecoder(r.Body)
 	dec.Decode(&bo)
-
-	verbosePrint("Received request: %v", bo)
 
 	status := OrderStatus{}
 	switch r.Method {
@@ -120,4 +91,22 @@ func (osrv *OrderServer) serveSubmit(rw http.ResponseWriter, r *http.Request) {
 
 	enc := json.NewEncoder(rw)
 	enc.Encode(status)
+}
+
+func (osrv *OrderServer) serveNotify(rw http.ResponseWriter, r *http.Request) {
+	verbosePrint("Serving notify: %v", r)
+	enableCors(&rw)
+
+	q := r.URL.Query()
+	id, err := strconv.Atoi(q.Get("id"))
+	if err != nil {
+		fmt.Printf("Error reading notify ID: %s\n", err)
+	} else {
+		completeOrder(id)
+	}
+}
+
+func enableCors(w *http.ResponseWriter) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Content-Type", "application/json")
 }

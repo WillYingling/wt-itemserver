@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"os"
 )
 
@@ -59,7 +60,8 @@ func (il ItemList) MarshalJSON() ([]byte, error) {
 	return []byte(final), nil
 }
 
-func loadItemDir(dir string) (ItemList, error) {
+func loadItemDir() (ItemList, error) {
+	dir := viper.GetString("itemDir")
 	fd, err := os.Open(dir)
 	if err != nil {
 		return nil, err
